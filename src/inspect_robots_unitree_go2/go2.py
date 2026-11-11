@@ -291,6 +291,19 @@ class Go2WebRTCDriver:
                 raise RuntimeError(f"no fresh Go2 sport state within {timeout_s} s: {error}")
             sleep(0.05)
 
+    def wait_for_frame(self, timeout_s: float, sleep: Callable[[float], None]) -> None:
+        """Block until a fresh camera frame arrives, or raise after ``timeout_s``."""
+        deadline = self._clock() + timeout_s
+        while True:
+            try:
+                self._check_frame()
+                return
+            except RuntimeError as exc:
+                error = exc
+            if self._clock() >= deadline:
+                raise RuntimeError(f"no fresh Go2 camera frame within {timeout_s} s: {error}")
+            sleep(0.05)
+
     def check_ready(self, sleep: Callable[[float], None]) -> None:
         """Refuse a robot that is not standing, then unlock ``Move`` with BalanceStand."""
         self.wait_for_state(self._cfg.connect_timeout_s, sleep)
@@ -324,6 +337,20 @@ class Go2WebRTCDriver:
 
     def read_frame(self) -> Frame:
         """The latest front-camera frame, resized to the declared shape."""
+        frame = self._check_frame()
+        return resize_nearest(frame, self._cfg.camera_height, self._cfg.camera_width)
+
+    def check_fresh(self) -> None:
+        """Raise unless both the sport state and the camera frame are fresh.
+
+        Cheap (no resize): the embodiment calls it before latching a motion
+        command and on every streamer tick while walking.
+        """
+        with self._lock:
+            self._fresh_locked()
+        self._check_frame()
+
+    def _check_frame(self) -> Frame:
         latest = self._link.latest_frame()
         if latest is None:
             raise RuntimeError("no Go2 camera frame received yet")
@@ -331,7 +358,7 @@ class Go2WebRTCDriver:
         age = self._clock() - stamp
         if age > self._cfg.frame_stale_s:
             raise RuntimeError(f"Go2 camera frame is {age:.2f} s old")
-        return resize_nearest(frame, self._cfg.camera_height, self._cfg.camera_width)
+        return frame
 
     def disconnect(self) -> None:
         """Send ``StopMove`` (best effort), then close the link. Idempotent."""
@@ -402,6 +429,8 @@ def connect_go2(
     try:
         link.start(driver.on_sport_state, connect_timeout_s=cfg.connect_timeout_s, video=video)
         if ready_check:
+            if video:
+                driver.wait_for_frame(cfg.connect_timeout_s, sleep)
             driver.check_ready(sleep)
     except BaseException:
         with contextlib.suppress(Exception):

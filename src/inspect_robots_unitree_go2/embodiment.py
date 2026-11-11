@@ -196,6 +196,8 @@ class LeggedEmbodiment:
         velocity = clamped[:ACTION_DIM] * self._cfg.control_hz
         period = 1.0 / self._cfg.control_hz
         try:
+            # Never start walking on a feed that has already gone stale.
+            self._check_fresh(self._require_driver())
             with self._lock:
                 self._command = velocity
                 self._standing = False
@@ -319,6 +321,7 @@ class LeggedEmbodiment:
         if standing:
             driver.stand()
         else:
+            self._check_fresh(driver)
             driver.send_velocity(float(velocity[0]), float(velocity[1]), float(velocity[2]))
         self._stream_extra(driver)
 
@@ -349,8 +352,31 @@ class LeggedEmbodiment:
                 self.stream_once()
             except BaseException as exc:
                 self._stream_error = exc
+                self._stop_after_stream_failure()
                 return
             self._stop_streamer.wait(period)
+
+    def _stop_after_stream_failure(self) -> None:
+        """Best effort: tell the robot to stand now, not on the next ``step``.
+
+        Runs on the streamer thread, so it must not join the streamer. The
+        next ``step`` (or ``close``) still raises the error and tears down.
+        """
+        self._hold_stand()
+        driver = self._driver
+        if driver is None:
+            return
+        try:
+            driver.stand()
+        except Exception as exc:
+            print(f"warning: stand after streamer failure also failed: {exc!r}")
+
+    @staticmethod
+    def _check_fresh(driver: LeggedDriver) -> None:
+        """Run the backend's freshness check, if it has one (real robots do)."""
+        check = getattr(driver, "check_fresh", None)
+        if callable(check):
+            check()
 
     def _hold_stand(self) -> None:
         with self._lock:

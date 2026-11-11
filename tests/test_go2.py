@@ -356,7 +356,7 @@ def test_connect_go2_wires_state_and_checks_readiness() -> None:
         clock.t += dt
         conn.push_state(sample())
 
-    driver = connect_go2(cfg(), conn, clock=clock, sleep=sleep)
+    driver = connect_go2(cfg(), conn, clock=clock, sleep=sleep, video=False)
     assert [opts["api_id"] for _, opts in conn.datachannel.pub_sub.requests] == [BALANCE_STAND]
     driver.disconnect()
     assert conn.disconnects == 1
@@ -375,6 +375,45 @@ def test_connect_go2_without_ready_check_and_closes_on_failure() -> None:
     with pytest.raises(ConnectionError, match="RobotBusy"):
         connect_go2(cfg(), busy, clock=clock, sleep=lambda _: None)
     assert busy.disconnects == 1
+
+
+def test_connect_go2_waits_for_the_first_frame_and_gives_up_cleanly() -> None:
+    clock = Clock()
+    conn = FakeConn()
+
+    def sleep(dt: float) -> None:
+        clock.t += dt
+        conn.push_state(sample())
+
+    with pytest.raises(RuntimeError, match="no fresh Go2 camera frame within"):
+        connect_go2(cfg(connect_timeout_s=0.2), conn, clock=clock, sleep=sleep)
+    assert conn.datachannel.pub_sub.requests == []  # never reached BalanceStand
+    assert conn.disconnects == 1
+
+
+def test_wait_for_frame_returns_once_a_frame_arrives() -> None:
+    driver, link, clock = make_driver()
+
+    def sleep(dt: float) -> None:
+        clock.t += dt
+        link.frame = (clock.t, np.zeros((8, 12, 3), dtype=np.uint8))
+
+    driver.wait_for_frame(1.0, sleep)
+    assert link.frame is not None
+
+
+def test_check_fresh_needs_both_state_and_frame() -> None:
+    driver, link, clock = make_driver()
+    with pytest.raises(RuntimeError, match="no Go2 sport state"):
+        driver.check_fresh()
+    driver.on_sport_state(sample())
+    with pytest.raises(RuntimeError, match="no Go2 camera frame"):
+        driver.check_fresh()
+    link.frame = (clock.t, np.zeros((8, 12, 3), dtype=np.uint8))
+    driver.check_fresh()
+    clock.t += 0.8
+    with pytest.raises(RuntimeError, match=r"sport state is 0\.80 s old"):
+        driver.check_fresh()
 
 
 # ---------------------------------------------------------------------- helpers

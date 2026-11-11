@@ -38,6 +38,7 @@ class FakeDriver:
         self.stand_error: BaseException | None = None
         self.disconnect_error: BaseException | None = None
         self.send_error: BaseException | None = None
+        self.fresh_error: BaseException | None = None
 
     def send_velocity(self, forward: float, left: float, turn: float) -> None:
         if self.send_error is not None:
@@ -58,6 +59,10 @@ class FakeDriver:
 
     def read_frame(self) -> np.ndarray:
         return self.frame
+
+    def check_fresh(self) -> None:
+        if self.fresh_error is not None:
+            raise self.fresh_error
 
     def disconnect(self) -> None:
         self.events.append("disconnect")

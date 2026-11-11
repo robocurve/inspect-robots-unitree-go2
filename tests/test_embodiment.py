@@ -201,12 +201,50 @@ def test_stream_failure_is_reported_and_stops_the_next_step(rig: Rig) -> None:
     rig.emb.step(Action(data=np.asarray((0.05, 0.0, 0.0))))
     rig.driver.send_error = OSError("socket closed")
     rig.threads[0].target()  # loop exits after recording the error
+    assert rig.driver.events[-1] == "stand"  # stopped at once, not on the next step
     report = rig.emb.health()
     assert report.ok is False
     assert "socket closed" in report.summary()
     with pytest.raises(RuntimeError, match="streamer stopped"):
         rig.emb.step(Action(data=np.zeros(3)))
     assert rig.driver.events[-1] == "disconnect"
+
+
+def test_stream_failure_still_returns_when_the_stand_also_fails(
+    rig: Rig, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rig.reset()
+    rig.emb.step(Action(data=np.asarray((0.05, 0.0, 0.0))))
+    rig.driver.send_error = OSError("socket closed")
+    rig.driver.stand_error = OSError("still closed")
+    rig.threads[0].target()
+    assert "stand after streamer failure also failed" in capsys.readouterr().out
+    assert rig.emb._stream_error is not None
+
+
+def test_stop_after_stream_failure_without_a_driver_is_a_no_op(rig: Rig) -> None:
+    rig.emb._stop_after_stream_failure()
+    assert rig.driver.events == []
+
+
+def test_step_refuses_to_move_on_stale_feeds(rig: Rig) -> None:
+    rig.reset()
+    rig.driver.fresh_error = RuntimeError("Go2 camera frame is 2.00 s old")
+    with pytest.raises(RuntimeError, match=r"2\.00 s old"):
+        rig.emb.step(Action(data=np.asarray((0.05, 0.0, 0.0))))
+    assert not any(isinstance(event, tuple) for event in rig.driver.events)
+    assert rig.driver.events[-1] == "disconnect"
+
+
+def test_streamer_stops_walking_when_feeds_go_stale(rig: Rig) -> None:
+    rig.reset()
+    rig.emb.step(Action(data=np.asarray((0.05, 0.0, 0.0))))
+    rig.clock.now -= 0.05  # back inside the step's deadline
+    rig.driver.fresh_error = RuntimeError("Go2 sport state is 0.80 s old")
+    sent = len(rig.driver.events)
+    rig.threads[0].target()
+    assert rig.driver.events[sent:] == ["stand"]
+    assert "0.80 s old" in rig.emb.health().summary()
 
 
 def test_stream_failure_during_step_is_raised_after_observing(rig: Rig) -> None:
