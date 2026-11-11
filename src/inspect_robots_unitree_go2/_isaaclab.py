@@ -98,6 +98,15 @@ class IsaacLabVelocityDriver:  # pragma: no cover - needs Isaac Sim and a GPU
         # The command's debug arrows float over the robot and fill the head camera.
         command_cfg.debug_vis = False
         env_cfg.episode_length_s = 1.0e6
+        # Always walk on a flat floor. A rough-terrain task keeps its height
+        # scanner, which reads the plane at /World/ground as level ground.
+        terrain = env_cfg.scene.terrain
+        if getattr(terrain, "terrain_type", "plane") != "plane":
+            terrain.terrain_type = "plane"
+            terrain.terrain_generator = None
+            curriculum = getattr(env_cfg, "curriculum", None)
+            if curriculum is not None and hasattr(curriculum, "terrain_levels"):
+                curriculum.terrain_levels = None
         # Start at the env origin facing +x, at rest, so props sit where PROPS says
         # relative to the robot. The task randomises the reset pose by default.
         reset_base = getattr(env_cfg.events, "reset_base", None)

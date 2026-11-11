@@ -178,7 +178,9 @@ class Go2Config(LeggedConfig):
     max_backward_speed: float = 0.25
     max_lateral_speed: float = 0.25
     max_turn_rate: float = 0.8
-    isaac_task: str = "Isaac-Velocity-Flat-Unitree-Go2-Play-v0"
+    #: The rough-terrain policy (run on flat ground) follows turn commands; the
+    #: pretrained flat-terrain Go2 policy stalls on in-place turns.
+    isaac_task: str = "Isaac-Velocity-Rough-Unitree-Go2-Play-v0"
     connection: str = "local_sta"
     robot_ip: str = ""
     serial_number: str = ""
