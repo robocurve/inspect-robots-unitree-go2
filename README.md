@@ -6,9 +6,9 @@ embodiment, `go2_base`: the LLM steers the body and the Go2's own walking
 controller handles the legs.
 
 > [!NOTE]
-> Alpha, written before we had the robot. The `kinematic` backend and the
-> fake-connection tests are verified. The real backend follows the
-> `unitree_webrtc_connect` source (2.2.0) but has not run on a Go2.
+> Alpha, written before we had the robot. The `kinematic` backend, the Isaac
+> Lab backend and the fake-connection tests are verified. The real backend
+> follows the `unitree_webrtc_connect` source (2.2.0) but has not run on a Go2.
 
 ## Action and observation contract
 
@@ -94,9 +94,12 @@ the command line. Turn off automatic firmware updates before an event.
 
 - `-E backend=kinematic` runs anywhere: a point robot with a top-down camera.
 - `-E backend=isaaclab -E isaac_checkpoint=PATH/policy.pt` needs an Isaac
-  Lab 2.3 machine with a GPU. It runs `Isaac-Velocity-Flat-Unitree-Go2-Play-v0`
-  with a camera on the body. `policy.pt` is the TorchScript walking policy
-  that Isaac Lab's `rsl_rl/play.py --use_pretrained_checkpoint` exports.
+  Lab 2.3 machine with a GPU. It runs `Isaac-Velocity-Rough-Unitree-Go2-Play-v0`
+  on a flat floor with a camera on the body. `policy.pt` is the TorchScript
+  walking policy that Isaac Lab's `rsl_rl/play.py --use_pretrained_checkpoint`
+  exports for `Isaac-Velocity-Rough-Unitree-Go2-v0`. The pretrained flat-terrain
+  policy is not used because it barely turns in place. The rough policy walks
+  forward accurately but turns about 60 percent of what is commanded.
 
 ## Develop
 
