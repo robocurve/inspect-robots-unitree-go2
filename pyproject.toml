@@ -1,0 +1,121 @@
+[build-system]
+requires = ["hatchling>=1.18", "hatch-vcs>=0.3", "hatch-fancy-pypi-readme>=24.1"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inspect-robots-unitree-go2"
+dynamic = ["version", "readme"]
+description = "Inspect Robots embodiment for walking a Unitree Go2 Air through its sport controller over WebRTC."
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "RoboCurve" }]
+keywords = ["robotics", "quadruped", "unitree", "go2", "llm-agent", "inspect-robots"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "inspect-robots>=0.59",
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+hardware = [
+    "unitree_webrtc_connect>=2.2,<2.3",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pre-commit>=3.5",
+    "numpy<2.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/robocurve/inspect-robots-unitree-go2"
+Framework = "https://github.com/robocurve/inspect-robots"
+
+[project.scripts]
+inspect-robots-go2-check = "inspect_robots_unitree_go2.check:main"
+
+[project.entry-points."inspect_robots.embodiments"]
+go2_base = "inspect_robots_unitree_go2.embodiment:Go2Embodiment"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inspect_robots_unitree_go2"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+version_scheme = "guess-next-dev"
+fallback_version = "0.0.0"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF", "D1"]
+ignore = ["D105", "D107"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D1"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["inspect_robots_unitree_go2"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/inspect_robots_unitree_go2"]
+
+[[tool.mypy.overrides]]
+module = ["unitree_webrtc_connect", "unitree_webrtc_connect.*", "cv2", "cv2.*", "isaaclab", "isaaclab.*", "isaaclab_tasks", "isaaclab_tasks.*", "torch", "torch.*", "gymnasium", "gymnasium.*", "aiortc", "aiortc.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+pythonpath = ["tests"]
+
+[tool.coverage.run]
+branch = true
+# Needs MuJoCo and the vendor models; verified by running, not unit tested.
+omit = ["*/_isaaclab.py"]
+source = ["inspect_robots_unitree_go2"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "@(abc\\.)?abstractmethod",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "^\\s*\\.\\.\\.$",
+    ": \\.\\.\\.$",
+    "pragma: no cover",
+]
+
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(?m)^> \[!NOTE\][ \t]*$'
+replacement = '> **Note:**'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(?m)^> \[!WARNING\][ \t]*$'
+replacement = '> **Warning:**'
